@@ -1,13 +1,10 @@
-# Kart Racing 3D
+# Kart racing
 
-Jogo de corrida de kart em 3D feito com [Three.js](https://threejs.org/) (WebGL2), desenvolvido
-como projeto final da disciplina de Computação Gráfica (UNIFESP).
-
-**Grupo:** Guilherme Ferro e Miguel Hova
+Jogo de corrida de kart em 3D feito com [Three.js](https://threejs.org/)
 
 ## Sobre o jogo
 
-A proposta é uma corrida de 3 voltas em uma pista de ~1.200 m, com 4 karts: o jogador e 3
+A proposta é uma corrida de 3 voltas em uma pista com 4 karts: o jogador e 3
 adversários controlados por IA. A mecânica central é o **drift**: segurar a derrapagem nas curvas
 carrega um miniturbo que dá um impulso na saída.
 
@@ -15,12 +12,16 @@ Alguns pontos técnicos do projeto:
 
 - **Física própria**, sem engines prontas (cannon-es, rapier etc.), com simulação em passo fixo
   de 60 Hz e renderização interpolada entre os estados.
+
 - **Pista gerada a partir de uma spline** (`CatmullRomCurve3`): asfalto, grama, zebras, guard
   rails, waypoints e checkpoints saem dos mesmos pontos de controle.
+
 - **Modelo hierárquico do kart**, com animação procedural (rodas, esterço, rolagem do chassi).
   Os 4 karts usam a mesma geometria e variam só cor, número e detalhes.
+
 - **IA que "dirige como o jogador"**: os adversários geram os mesmos comandos do teclado
   (acelerar, frear, virar, drift), sem mexer direto na física.
+
 - **Simulação determinística** (RNG com seed), o que permite replay a partir dos inputs.
 
 ### Estado atual
@@ -31,7 +32,7 @@ Alguns pontos técnicos do projeto:
 - câmera de perseguição em terceira pessoa.
 
 Ainda **não** implementados: drift e miniturbo, adversários com IA, voltas e checkpoints,
-pontuação, HUD, colisões entre karts, zebras/guard rails, gamepad e a pista final de ~1.200 m.
+pontuação, HUD, colisões entre karts, zebras/guard rails
 
 
 
