@@ -1,0 +1,28 @@
+{
+  "name": "joguinho",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Jogo de corrida de kart 3D com drift — projeto final de Computação Gráfica (Three.js + WebGL2)",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "dev:lan": "vite --host",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "three": "^0.180.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "eslint": "^9.39.5",
+    "globals": "^17.13.0",
+    "vite": "^7.0.0",
+    "vitest": "^3.2.7"
+  },
+  "engines": {
+    "node": ">=20.19.0"
+  }
+}

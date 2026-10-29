@@ -1,0 +1,201 @@
+/* Modelo hierarquico do kart. 
+
+ root                      posicao/heading (interpolados do KartState)
+ ├─ chassis                reservado p/ roll/pitch procedural
+ │  ├─ body                carcaca
+ │  ├─ windows             cabine (vidro)
+ │  ├─ number              placa traseira
+ │  └─ driver
+ │     ├─ torso
+ │     └─ head
+ │        └─ helmet
+ ├─ steerFL -> wheelFL     pivo de esterco -> no de giro
+ ├─ steerFR -> wheelFR
+ ├─ wheelRL
+ └─ wheelRR
+*/ 
+
+import {
+  BufferGeometry,
+  CylinderGeometry,
+  ExtrudeGeometry,
+  Group,
+  Mesh,
+  MeshStandardMaterial,
+  PlaneGeometry,
+  Shape,
+  SphereGeometry,
+} from 'three';
+import { KART_TYPES } from '../config/tuning.js';
+import { createNumberTexture, getMaterials } from '../render/materials.js';
+import { KART_SHAPES } from './kartShapes.js';
+
+const BEVEL = 0.05; // m - arredondamento das arestas da carcaca/cabine
+const HELMET_RADIUS = 0.14; // m
+const HEAD_RADIUS = 0.1; // m
+const TORSO_HEIGHT = 0.4; // m
+
+// Geometrias compartilhadas por tipo 
+const geometryCache = new Map();
+
+/** Extruda um perfil lateral na largura do kart, centrado em x. */
+function extrudeProfile(draw, width) {
+  const shape = new Shape();
+  draw(shape);
+  const depth = width - 2 * BEVEL;
+  const geometry = new ExtrudeGeometry(shape, {
+    depth,
+    curveSegments: 16,
+    bevelEnabled: true,
+    bevelThickness: BEVEL,
+    bevelSize: BEVEL,
+    bevelSegments: 3,
+  });
+
+  // Shape x -> kart z (frente), extrusao -> kart x
+  geometry.rotateY(-Math.PI / 2);
+  geometry.translate(depth / 2, 0, 0);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+/** Capacete: esfera aberta embaixo, com a faixa da frente num 2o grupo de material (viseira). */
+
+function createHelmetGeometry() {
+  const geometry = new SphereGeometry(HELMET_RADIUS, 20, 14, 0, Math.PI * 2, 0, Math.PI * 0.78);
+  const index = geometry.index.array;
+  const pos = geometry.attributes.position;
+  const shell = [];
+  const visor = [];
+  for (let i = 0; i < index.length; i += 3) {
+    let y = 0;
+    let z = 0;
+    for (let k = 0; k < 3; k++) {
+      y += pos.getY(index[i + k]) / 3;
+      z += pos.getZ(index[i + k]) / 3;
+    }
+    const isVisor = z > HELMET_RADIUS * 0.45 && y > -HELMET_RADIUS * 0.35 && y < HELMET_RADIUS * 0.35;
+    (isVisor ? visor : shell).push(index[i], index[i + 1], index[i + 2]);
+  }
+  geometry.setIndex([...shell, ...visor]);
+  geometry.clearGroups();
+  geometry.addGroup(0, shell.length, 0);
+  geometry.addGroup(shell.length, visor.length, 1);
+  return geometry;
+}
+
+function getGeometries(type) {
+  if (geometryCache.has(type)) return geometryCache.get(type);
+  const shape = KART_SHAPES[type];
+  const tire = new CylinderGeometry(shape.wheelRadius, shape.wheelRadius, shape.wheelWidth, 24);
+  tire.rotateZ(Math.PI / 2); // eixo da roda = X local: o proprio Mesh e o no de giro
+  const geometries = {
+    body: extrudeProfile(shape.body, shape.bodyWidth),
+    cabin: extrudeProfile(shape.cabin, shape.cabinWidth),
+    plate: new PlaneGeometry(0.3, 0.3),
+    tire,
+    torso: new CylinderGeometry(0.15, 0.19, TORSO_HEIGHT, 12),
+    head: new SphereGeometry(HEAD_RADIUS, 14, 10),
+    helmet: createHelmetGeometry(),
+  };
+  geometries.body.computeBoundingBox();
+  geometryCache.set(type, geometries);
+  return geometries;
+}
+
+export function disposeKartGeometries() {
+  for (const geometries of geometryCache.values()) {
+    Object.values(geometries).forEach((g) => g instanceof BufferGeometry && g.dispose());
+  }
+  geometryCache.clear();
+}
+
+function mesh(name, geometry, material) {
+  const m = new Mesh(geometry, material);
+  m.name = name;
+  m.castShadow = true;
+  return m;
+}
+
+/**
+ * @param {{ type: 'sport' | 'sedan', color: number, number: number }} options
+ * @returns {{
+ *   root: Group,
+ *   nodes: Record<string, import('three').Object3D>,
+ *   wheelRadius: number,
+ *   anim: { wheelSpin: number },
+ *   dispose: () => void,
+ * }}
+ */
+export function createKartModel({ type, color, number }) {
+  const shape = KART_SHAPES[type];
+  const g = getGeometries(type);
+  const shared = getMaterials();
+
+  // Por instancia: cor da carcaca/capacete e textura do numero
+  const paint = new MeshStandardMaterial({ color, roughness: 0.35, metalness: 0.4 });
+  const numberTexture = createNumberTexture(number);
+  const plateMaterial = new MeshStandardMaterial({ map: numberTexture, roughness: 0.6 });
+
+  const root = new Group();
+  root.name = `kart-${type}-${number}`;
+
+  const chassis = new Group();
+  chassis.name = 'chassis';
+  const body = mesh('body', g.body, paint);
+  const windows = mesh('windows', g.cabin, shared.glass);
+  windows.castShadow = false;
+  const plate = mesh('number', g.plate, plateMaterial);
+  plate.castShadow = false;
+  plate.position.set(0, shape.plateY, g.body.boundingBox.min.z - 0.005);
+  plate.rotation.y = Math.PI; // virada para -Z (traseira)
+
+  const driver = new Group();
+  driver.name = 'driver';
+  driver.position.set(0, shape.seat.y, shape.seat.z);
+  const torso = mesh('torso', g.torso, shared.suit);
+  torso.position.y = TORSO_HEIGHT / 2;
+  const head = mesh('head', g.head, shared.skin);
+  head.position.y = TORSO_HEIGHT + HEAD_RADIUS * 0.9;
+  const helmet = mesh('helmet', g.helmet, [paint, shared.visor]);
+  helmet.position.y = HELMET_RADIUS - HEAD_RADIUS; // casco centrado um pouco acima da cabeca
+
+  head.add(helmet);
+  driver.add(torso, head);
+  chassis.add(body, windows, plate, driver);
+  root.add(chassis);
+
+  // Rodas expostas, fora da carcaca; entre-eixos vem do tuning (mesma fonte da fisica)
+  const halfBase = KART_TYPES[type].wheelBase / 2;
+  const wheelX = shape.bodyWidth / 2 + shape.wheelWidth / 2 - 0.02;
+  const tireMaterials = [shared.tireTread, shared.tireCap, shared.tireCap];
+  const nodes = { root, chassis, body, windows, number: plate, driver, torso, head, helmet };
+
+  for (const [side, x] of [['L', wheelX], ['R', -wheelX]]) {
+    // Frente: pivo de esterco (rotation.y) separado do no de giro (rotation.x)
+    const steer = new Group();
+    steer.name = `steerF${side}`;
+    steer.position.set(x, shape.wheelRadius, halfBase);
+    const front = mesh(`wheelF${side}`, g.tire, tireMaterials);
+    steer.add(front);
+    const rear = mesh(`wheelR${side}`, g.tire, tireMaterials);
+    rear.position.set(x, shape.wheelRadius, -halfBase);
+    root.add(steer, rear);
+    nodes[steer.name] = steer;
+    nodes[front.name] = front;
+    nodes[rear.name] = rear;
+  }
+
+  return {
+    root,
+    nodes,
+    wheelRadius: shape.wheelRadius,
+    anim: { wheelSpin: 0 },
+    dispose() {
+      paint.dispose();
+      plateMaterial.dispose();
+      numberTexture.dispose();
+      root.removeFromParent();
+    },
+  };
+}
