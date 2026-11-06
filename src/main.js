@@ -8,12 +8,15 @@ import { updateKartVisual } from './kart/kartAnimation.js';
 import { stepKart } from './physics/kartPhysics.js';
 import { createKartInput, createKartState, resetKartState } from './physics/kartState.js';
 import { createChaseCamera } from './render/camera.js';
+import { createDemoMode } from './render/demoMode.js';
 import { createLights } from './render/lights.js';
 import { getMaterials } from './render/materials.js';
+import { configureTextures } from './render/textures.js';
 import { TEST_TRACK } from './track/trackData.js';
-import { buildTrackSamples } from './track/trackGeometry.js';
+import { buildTrackSamples, tightestSampleIndex } from './track/trackGeometry.js';
 import { createTrackMeshes } from './track/trackMeshes.js';
 import { createTrackQuery } from './track/trackQuery.js';
+import { createDemoHud } from './ui/demoHud.js';
 
 const SKY = 0x8fbbe3;
 
@@ -24,6 +27,7 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = PCFSoftShadowMap;
 renderer.toneMapping = ACESFilmicToneMapping;
+configureTextures(renderer); // anisotropia maxima; antes de getMaterials()
 
 const scene = new Scene();
 scene.background = new Color(SKY);
@@ -62,6 +66,24 @@ const keyboard = createKeyboardInput(window);
 const chase = createChaseCamera(window.innerWidth / window.innerHeight);
 const lights = createLights(scene);
 
+const hairpin = tightestSampleIndex(samples); // alvo da inspecao para ver a distorcao no grampo
+
+// Modo de demonstracao (so render): alvos da camera de inspecao
+const hud = createDemoHud();
+const demo = createDemoMode({
+  scene,
+  domElement: canvas,
+  aspect: window.innerWidth / window.innerHeight,
+  targets: [
+    { name: 'kart do jogador', get: (out) => out.copy(player.model.root.position).setY(0.6) },
+    { name: 'kart sedan', get: (out) => out.copy(karts[1].model.root.position).setY(0.6) },
+    { name: 'emenda da volta (largada)', get: (out) => out.set(samples.px[0], 0, samples.pz[0]) },
+    { name: 'grampo', get: (out) => out.set(samples.px[hairpin], 0, samples.pz[hairpin]) },
+  ],
+  onChange: (state, targetName) => hud.update(state, targetName),
+});
+demo.collect();
+
 function step() {
   keyboard.read(player.input);
   // R volta o jogador para o grid (ainda nao ha respawn)
@@ -78,12 +100,14 @@ function render(alpha, frameTime) {
   const root = player.model.root;
   chase.update(root.position, root.rotation.y, frameTime);
   lights.follow(root.position);
-  renderer.render(scene, chase.camera);
+  demo.update();
+  renderer.render(scene, demo.camera(chase.camera));
 }
 
 window.addEventListener('resize', () => {
   chase.camera.aspect = window.innerWidth / window.innerHeight;
   chase.camera.updateProjectionMatrix();
+  demo.resize(window.innerWidth / window.innerHeight);
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
 

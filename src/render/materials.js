@@ -1,42 +1,49 @@
 // Materiais e texturas. Compartilhados entre os 4 karts; so cor e numero sao por instancia.
-import { CanvasTexture, DoubleSide, MeshStandardMaterial, SRGBColorSpace } from 'three';
+import { CanvasTexture, DoubleSide, MeshStandardMaterial, SRGBColorSpace, Vector2 } from 'three';
+import { loadTexture } from './textures.js';
+
+// Quantas vezes cada textura repete dentro de 1 unidade de UV da malha (inteiro: emenda continua).
+// Asfalto: UV = 12 m x ~12 m -> tile de 4 m. Grama, zebra e rail ja tem UV em tiles.
+const ASPHALT_REPEAT = [3, 3];
+
+// Repeat do UV checker na zebra (u = 1 m, v = 2 m): celulas quadradas no mundo. Os outros
+// materiais usam (1, 1). Lido por render/demoMode.js.
+const CURB_CHECKER_REPEAT = [1, 2];
 
 let shared = null;
 
-/** Textura da tampa do pneu: raios claros para o giro da roda ficar visivel. */
-function createWheelCapTexture() {
-  const size = 128;
-  const canvas = document.createElement('canvas');
-  canvas.width = canvas.height = size;
-  const g = canvas.getContext('2d');
-  const c = size / 2;
-  g.fillStyle = '#151515';
-  g.fillRect(0, 0, size, size);
-  g.fillStyle = '#9a9ea6';
-  g.beginPath();
-  g.arc(c, c, size * 0.3, 0, Math.PI * 2);
-  g.fill();
-  g.strokeStyle = '#2a2a2a';
-  g.lineWidth = size * 0.06;
-  for (let i = 0; i < 5; i++) {
-    const a = (i / 5) * Math.PI * 2;
-    g.beginPath();
-    g.moveTo(c, c);
-    g.lineTo(c + Math.cos(a) * size * 0.3, c + Math.sin(a) * size * 0.3);
-    g.stroke();
-  }
-  const texture = new CanvasTexture(canvas);
-  texture.colorSpace = SRGBColorSpace;
-  return texture;
-}
-
-/** Materiais compartilhados */
+/** Materiais compartilhados. Chamar configureTextures(renderer) antes (anisotropia). */
 export function getMaterials() {
   if (shared) return shared;
-  const wheelCap = createWheelCapTexture();
+  const textures = {
+    asphaltColor: loadTexture('asphalt_color', { color: true, repeat: ASPHALT_REPEAT }),
+    asphaltNormal: loadTexture('asphalt_normal', { repeat: ASPHALT_REPEAT }),
+    asphaltRoughness: loadTexture('asphalt_roughness', { repeat: ASPHALT_REPEAT }),
+    grassColor: loadTexture('grass_color', { color: true }),
+    curbColor: loadTexture('curb_color', { color: true }),
+    railColor: loadTexture('guardrail_color', { color: true }),
+    railNormal: loadTexture('guardrail_normal'),
+    railRoughness: loadTexture('guardrail_roughness'),
+    kartAtlas: loadTexture('kart_atlas', { color: true, clamp: true }),
+  };
+  const atlas = textures.kartAtlas;
   shared = {
-    asphalt: new MeshStandardMaterial({ color: 0x3b3c40, roughness: 0.92 }),
-    grass: new MeshStandardMaterial({ color: 0x4d8a3c, roughness: 1 }),
+    asphalt: new MeshStandardMaterial({
+      map: textures.asphaltColor,
+      normalMap: textures.asphaltNormal,
+      normalScale: new Vector2(0.9, 0.9),
+      roughnessMap: textures.asphaltRoughness,
+      roughness: 1, // multiplica o roughnessMap
+    }),
+    grass: new MeshStandardMaterial({ map: textures.grassColor, roughness: 1 }),
+    curb: new MeshStandardMaterial({ map: textures.curbColor, roughness: 0.7 }),
+    rail: new MeshStandardMaterial({
+      map: textures.railColor,
+      normalMap: textures.railNormal,
+      roughnessMap: textures.railRoughness,
+      roughness: 1,
+      metalness: 0.35, // sem envMap, metal alto fica escuro: so o especular do sol
+    }),
     glass: new MeshStandardMaterial({
       color: 0x16202b,
       roughness: 0.15,
@@ -45,13 +52,14 @@ export function getMaterials() {
       opacity: 0.55,
       depthWrite: false,
     }),
-    tireTread: new MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.95 }),
-    tireCap: new MeshStandardMaterial({ map: wheelCap, roughness: 0.7 }),
-    suit: new MeshStandardMaterial({ color: 0x2b2f3a, roughness: 0.8 }),
-    skin: new MeshStandardMaterial({ color: 0xe0b48c, roughness: 0.7 }),
+    tireTread: new MeshStandardMaterial({ map: atlas, roughness: 0.95 }),
+    tireCap: new MeshStandardMaterial({ map: atlas, roughness: 0.7 }),
+    suit: new MeshStandardMaterial({ map: atlas, roughness: 0.8 }),
+    skin: new MeshStandardMaterial({ map: atlas, roughness: 0.7 }),
     visor: new MeshStandardMaterial({ color: 0x0c0c10, roughness: 0.1, metalness: 0.5, side: DoubleSide }),
-    textures: { wheelCap },
+    textures,
   };
+  shared.curb.userData.checkerRepeat = CURB_CHECKER_REPEAT;
   return shared;
 }
 

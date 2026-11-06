@@ -46,3 +46,20 @@ Nos acessiveis por nome em `model.nodes`.
 
 Geometrias sao cacheadas por tipo e compartilhadas; `dispose()` do modelo libera so o que e da
 instancia (material de pintura, material/textura do numero). `disposeKartGeometries()` libera o cache.
+
+## Texturas e UV (`kartUV.js`)
+
+Um atlas compartilhado, `public/textures/kart_atlas.png` (1024x1024), com um retangulo por peca
+(`ATLAS_RECTS`, 8 px de margem). Layout em `docs/img/uv_kart_sport.png` e `uv_kart_sedan.png`.
+
+| peca | UV |
+|---|---|
+| carcaca (`body`) | projecao em caixa por triangulo, eixo dominante da normal: lateral (z, y), topo (z, x), frente/tras (x, y); 256 px/m em todas (`BODY_FRAME` cobre sport e sedan) |
+| pneu | banda: u = volta inteira (16 garras inteiras = emenda continua), v = largura; tampas: UV radial do cilindro no retangulo do cubo |
+| capacete, torso, cabeca | UV parametrico da esfera/cilindro remapeado para o retangulo (polo com u limitado a [0,1]) |
+| cabine (vidro), viseira | sem textura |
+| placa de numero | `CanvasTexture` por instancia (inalterada) |
+
+Pintura e capacete usam o material `paint` da instancia (`map` = atlas, `color` = cor do kart): o
+atlas e claro nessas areas e a cor multiplica. Pneu, macacao e pele sao materiais compartilhados
+com o mesmo atlas e cor branca.

@@ -29,6 +29,7 @@ import {
 import { KART_TYPES } from '../config/tuning.js';
 import { createNumberTexture, getMaterials } from '../render/materials.js';
 import { KART_SHAPES } from './kartShapes.js';
+import { ATLAS_RECTS, applyBodyBoxUV, remapToAtlas } from './kartUV.js';
 
 const BEVEL = 0.05; // m - arredondamento das arestas da carcaca/cabine
 const HELMET_RADIUS = 0.14; // m
@@ -84,19 +85,27 @@ function createHelmetGeometry() {
   return geometry;
 }
 
-function getGeometries(type) {
+/**
+ * Geometrias de um tipo de kart (cacheadas), ja com os UVs do atlas (ver kartUV.js).
+ * Exportada para os testes e para scripts/export-uv-layouts.js.
+ * @param {'sport' | 'sedan'} type
+ */
+export function getKartGeometries(type) {
   if (geometryCache.has(type)) return geometryCache.get(type);
   const shape = KART_SHAPES[type];
+  const R = ATLAS_RECTS;
   const tire = new CylinderGeometry(shape.wheelRadius, shape.wheelRadius, shape.wheelWidth, 24);
   tire.rotateZ(Math.PI / 2); // eixo da roda = X local: o proprio Mesh e o no de giro
+  // grupos do cilindro: 0 = banda (u da a volta inteira), 1 e 2 = tampas (UV radial)
+  remapToAtlas(tire, [R.tread, R.hub, R.hub]);
   const geometries = {
-    body: extrudeProfile(shape.body, shape.bodyWidth),
-    cabin: extrudeProfile(shape.cabin, shape.cabinWidth),
+    body: applyBodyBoxUV(extrudeProfile(shape.body, shape.bodyWidth)),
+    cabin: extrudeProfile(shape.cabin, shape.cabinWidth), // vidro, sem textura
     plate: new PlaneGeometry(0.3, 0.3),
     tire,
-    torso: new CylinderGeometry(0.15, 0.19, TORSO_HEIGHT, 12),
-    head: new SphereGeometry(HEAD_RADIUS, 14, 10),
-    helmet: createHelmetGeometry(),
+    torso: remapToAtlas(new CylinderGeometry(0.15, 0.19, TORSO_HEIGHT, 12), [R.suit]),
+    head: remapToAtlas(new SphereGeometry(HEAD_RADIUS, 14, 10), [R.skin]),
+    helmet: remapToAtlas(createHelmetGeometry(), [R.helmet, R.helmet]),
   };
   geometries.body.computeBoundingBox();
   geometryCache.set(type, geometries);
@@ -129,11 +138,11 @@ function mesh(name, geometry, material) {
  */
 export function createKartModel({ type, color, number }) {
   const shape = KART_SHAPES[type];
-  const g = getGeometries(type);
+  const g = getKartGeometries(type);
   const shared = getMaterials();
 
-  // Por instancia: cor da carcaca/capacete e textura do numero
-  const paint = new MeshStandardMaterial({ color, roughness: 0.35, metalness: 0.4 });
+  // Por instancia: cor da carcaca/capacete (tinge o atlas compartilhado) e textura do numero
+  const paint = new MeshStandardMaterial({ map: shared.textures.kartAtlas, color, roughness: 0.35, metalness: 0.4 });
   const numberTexture = createNumberTexture(number);
   const plateMaterial = new MeshStandardMaterial({ map: numberTexture, roughness: 0.6 });
 

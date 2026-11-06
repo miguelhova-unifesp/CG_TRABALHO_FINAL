@@ -35,17 +35,19 @@ describe('amostras da spline', () => {
 
 describe('malha do asfalto', () => {
   const pos = asphalt.attributes.position;
-  const rows = pos.count / 2;
+  const cols = TRACK_GEN.asphaltColumns;
+  const across = cols + 1; // vertices por linha
+  const rows = pos.count / across;
 
   it('tem uma linha por amostra + a linha de fechamento', () => {
     expect(rows).toBe(samples.count + 1);
-    expect(asphalt.index.count).toBe(samples.count * 6);
+    expect(asphalt.index.count).toBe(samples.count * cols * 6);
   });
 
   it('fecha o loop: a ultima linha coincide com a primeira', () => {
-    for (const v of [0, 1]) {
-      const first = 0 * 2 + v;
-      const last = (rows - 1) * 2 + v;
+    for (let v = 0; v < across; v++) {
+      const first = v;
+      const last = (rows - 1) * across + v;
       expect(pos.getX(last)).toBeCloseTo(pos.getX(first), 5);
       expect(pos.getY(last)).toBeCloseTo(pos.getY(first), 5);
       expect(pos.getZ(last)).toBeCloseTo(pos.getZ(first), 5);
@@ -54,8 +56,8 @@ describe('malha do asfalto', () => {
 
   it('tem a largura de TrackData em todas as linhas', () => {
     for (let r = 0; r < rows; r++) {
-      const l = r * 2;
-      const d = Math.hypot(pos.getX(l) - pos.getX(l + 1), pos.getZ(l) - pos.getZ(l + 1));
+      const l = r * across;
+      const d = Math.hypot(pos.getX(l) - pos.getX(l + cols), pos.getZ(l) - pos.getZ(l + cols));
       expect(d).toBeCloseTo(TEST_TRACK.width, 4);
     }
   });

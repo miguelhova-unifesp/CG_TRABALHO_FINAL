@@ -28,11 +28,13 @@ Alguns pontos técnicos do projeto:
 
 - kart dirigível com física própria (aceleração, freio, ré, aderência lateral, grama mais lenta);
 - 2 tipos de carcaça (*sport* e *sedan*) sobre o mesmo modelo hierárquico;
-- pista de teste provisória gerada pela spline;
-- câmera de perseguição em terceira pessoa.
+- pista de teste provisória gerada pela spline, com zebras e guard rails (só visuais);
+- câmera de perseguição em terceira pessoa;
+- texturas PNG (asfalto, grama, zebra, guard rail, atlas do kart) com UVs gerados, e um modo de
+  demonstração de texturas (ver [Modo de demonstração](#modo-de-demonstração-texturas)).
 
 Ainda **não** implementados: drift e miniturbo, adversários com IA, voltas e checkpoints,
-pontuação, HUD, colisões entre karts, zebras/guard rails
+pontuação, HUD de corrida, colisões entre karts e com os guard rails
 
 
 
@@ -57,6 +59,22 @@ node --version
 | Virar à direita               | `D` ou `→`      |
 | Voltar ao grid de largada     | `R`             |
 
+### Modo de demonstração (texturas)
+
+Só afeta a renderização; a física continua igual. As teclas também aparecem no painel do canto
+superior esquerdo.
+
+| Ação                                                        | Tecla |
+|-------------------------------------------------------------|-------|
+| Alternar texturas reais / UV checker (grade numerada)        | `T`   |
+| Alternar textura + iluminação / só textura (sem luz)         | `L`   |
+| Alternar câmera de perseguição / câmera de inspeção          | `C`   |
+| Próximo alvo da inspeção (jogador, sedan, emenda, grampo)    | `V`   |
+| Esconder/mostrar o painel (para screenshots)                 | `H`   |
+
+Na câmera de inspeção: arrastar com o botão esquerdo orbita, a roda dá zoom e o botão direito
+desloca. O kart continua dirigível e a câmera o acompanha.
+
 ## Outros comandos
 
 | Comando             | O que faz                                                        |
@@ -67,6 +85,8 @@ node --version
 | `npm run preview`   | serve a pasta `dist/` localmente (porta 4173) para testar o build |
 | `npm run test`      | roda os testes automatizados (Vitest)                            |
 | `npm run lint`      | verifica o código com ESLint                                     |
+| `npm run textures`  | regenera as texturas PNG em `public/textures/` (determinístico)  |
+| `npm run uv-layouts`| exporta imagens do layout UV (kart e pista) para `docs/img/`     |
 
 ### Publicando o build
 
@@ -167,13 +187,14 @@ precisa de mais segmentos para a silhueta parecer redonda, e o torso fica com 12
 - **Vidro:** material transparente (`opacity: 0.55`) com `depthWrite: false`, para não esconder o
   piloto no depth buffer. Por isso o vidro também não projeta sombra.
 - **Viseira:** `DoubleSide`, porque a esfera aberta deixa a face interna visível.
-- **Texturas geradas em `<canvas>` (`CanvasTexture`):**
-  - a **placa de número** é desenhada em 2D (retângulo arredondado e texto) e enviada para a GPU
-    como textura, uma por kart;
-  - a **tampa da roda** tem raios desenhados, porque um pneu liso girando parece parado, e os
-    raios tornam a rotação visível.
-
-  Ambas usam o espaço de cor sRGB, para as cores não saírem desbotadas.
+- **Atlas de textura:** carcaça, capacete, pneu (banda e tampa com raios), macacão e pele leem
+  um único PNG (`public/textures/kart_atlas.png`), cada peça no seu retângulo. As áreas pintáveis
+  do atlas são claras e a cor do material de cada kart multiplica a textura, então os 4 karts
+  usam a mesma imagem. Os raios na tampa continuam lá porque um pneu liso girando parece parado.
+  Detalhes dos UVs em [docs/KART_MODEL.md](docs/KART_MODEL.md).
+- **Placa de número** desenhada em `<canvas>` (`CanvasTexture`), uma por kart.
+- Texturas de cor em sRGB, para as cores não saírem desbotadas; anisotropia máxima da GPU e
+  mipmaps em todas.
 - **Z-fighting:** a placa fica 5 mm atrás da traseira da carcaça (calculada pelo *bounding box*).
   Dois planos na mesma profundidade fariam os pixels "brigarem" no depth buffer.
 

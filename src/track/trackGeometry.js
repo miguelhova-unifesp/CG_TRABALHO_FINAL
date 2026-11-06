@@ -56,3 +56,23 @@ export function buildTrackSamples(data, count) {
 
   return { count, width: data.width, length, px, pz, tx, tz, lx, lz, dist, curve };
 }
+
+/**
+ * Amostra de maior curvatura (o grampo). Usada so pela camera de inspecao e pelo export de UV.
+ * @param {TrackSamples} samples
+ * @returns {number} indice da amostra
+ */
+export function tightestSampleIndex(samples) {
+  let best = 0;
+  let bestTurn = 0;
+  for (let i = 0; i < samples.count; i++) {
+    const n = (i + 1) % samples.count;
+    // |t_i x t_(i+1)| = seno do angulo girado entre amostras
+    const turn = Math.abs(samples.tx[i] * samples.tz[n] - samples.tz[i] * samples.tx[n]);
+    if (turn > bestTurn) {
+      bestTurn = turn;
+      best = i;
+    }
+  }
+  return best;
+}

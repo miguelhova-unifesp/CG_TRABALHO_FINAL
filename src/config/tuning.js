@@ -62,6 +62,15 @@ export const TRACK_GEN = {
   asphaltY: 0.02, // m - altura do asfalto acima da grama (evita z-fighting)
   grassMargin: 60, // m - quanto o plano de grama passa da caixa da pista
   surfaceSearchWindow: 8, // amostras - janela de busca local a partir do indice anterior
+  asphaltColumns: 4, // colunas na largura do asfalto (reduz a "dobra" do UV afim nas curvas fechadas)
+  curbWidth: 1, // m - largura de cada zebra, colada na borda do asfalto (so visual)
+  railOffset: 7.5, // m - distancia da linha central ate a face do guard rail
+  railHeight: 0.8, // m
+  railThickness: 0.1, // m
+  // m - comprimento nominal de 1 tile de UV (v = 1) ao longo do tracado; o valor real e ajustado
+  // para caber um numero inteiro de tiles na volta (emenda sem salto)
+  uvTile: { asphalt: 12, curb: 2, rail: 2 },
+  grassTile: 8, // m - 1 tile de UV da grama (projecao planar no mundo)
 };
 
 export const GRID = {
