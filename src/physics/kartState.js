@@ -7,7 +7,7 @@ import { Vector3 } from 'three';
  @property {number} throttle [0, 1]
  @property {number} brake [0, 1] - freio andando para frente, re quase parado
  @property {number} steer [-1, 1] - +1 = direita
- @property {boolean} drift reservado (Espaco), ainda sem efeito
+ @property {boolean} drift botao de drift segurado (Espaco)
  */
 
 /**
@@ -25,6 +25,11 @@ import { Vector3 } from 'three';
  @property {number} prevSteerAngle (rad)
  @property {boolean} onAsphalt
  @property {number} trackIndex segmento da pista mais proximo (-1 = desconhecido)
+ @property {boolean} drifting em drift agora
+ @property {number} driftDir lado do drift travado na entrada: +1 = direita, -1 = esquerda, 0 = sem drift
+ @property {number} driftTime ha quanto tempo o drift atual dura (s) - base para o miniturbo
+ @property {number} driftAmount [0, 1] quanto da aderencia de drift esta aplicada (rampa entrada/saida)
+ @property {boolean} driftLatch o botao atual ja gerou um drift: precisa soltar para o proximo
  */
 
 /** @returns {KartInput} */
@@ -49,6 +54,11 @@ export function createKartState({ type, x, z, heading }) {
     prevSteerAngle: 0,
     onAsphalt: true,
     trackIndex: -1,
+    drifting: false,
+    driftDir: 0,
+    driftTime: 0,
+    driftAmount: 0,
+    driftLatch: false,
   };
   resetKartState(state, x, z, heading);
   return state;
@@ -66,6 +76,11 @@ export function resetKartState(state, x, z, heading) {
   state.prevSteerAngle = 0;
   state.onAsphalt = true;
   state.trackIndex = -1;
+  state.drifting = false;
+  state.driftDir = 0;
+  state.driftTime = 0;
+  state.driftAmount = 0;
+  state.driftLatch = false;
 }
 
 /** Guarda o estado atual como "anterior" antes de avancar um passo. */

@@ -1,9 +1,10 @@
 // Bootstrap: cria renderer, cena e inicia o game loop.
 import { ACESFilmicToneMapping, Color, Fog, PCFSoftShadowMap, Scene, WebGLRenderer } from 'three';
-import { GRID, TRACK_GEN } from './config/tuning.js';
+import { DEBUG_VIEW, GRID, TRACK_GEN } from './config/tuning.js';
 import { createKeyboardInput } from './core/input.js';
 import { createLoop } from './core/loop.js';
-import { createKartModel } from './kart/kartModel.js';
+import { createKartModel, getKartGeometries } from './kart/kartModel.js';
+import { HELMET_TEXTURE_SIZE } from './kart/kartUV.js';
 import { updateKartVisual } from './kart/kartAnimation.js';
 import { stepKart } from './physics/kartPhysics.js';
 import { createKartInput, createKartState, resetKartState } from './physics/kartState.js';
@@ -12,11 +13,13 @@ import { createDemoMode } from './render/demoMode.js';
 import { createLights } from './render/lights.js';
 import { getMaterials } from './render/materials.js';
 import { configureTextures } from './render/textures.js';
+import { createUvLayoutSpecs, drawUvLayout } from './render/uvLayout.js';
 import { TEST_TRACK } from './track/trackData.js';
 import { buildTrackSamples, tightestSampleIndex } from './track/trackGeometry.js';
 import { createTrackMeshes } from './track/trackMeshes.js';
 import { createTrackQuery } from './track/trackQuery.js';
-import { createDemoHud } from './ui/demoHud.js';
+import { createDemoHud, keyLabel } from './ui/demoHud.js';
+import { createUvLayoutPanel } from './ui/uvLayoutPanel.js';
 
 const SKY = 0x8fbbe3;
 
@@ -36,7 +39,8 @@ scene.fog = new Fog(SKY, 90, 340);
 // Pista: dados -> amostras -> malhas + consulta de superficie
 const samples = buildTrackSamples(TEST_TRACK, TRACK_GEN.samples);
 const track = createTrackQuery(samples);
-scene.add(createTrackMeshes(samples, getMaterials()).group);
+const trackMeshes = createTrackMeshes(samples, getMaterials());
+scene.add(trackMeshes.group);
 
 // Grid: jogador (sport) a direita; sedan parado a esquerda e a frente, visivel na largada
 function gridPose(slot) {
@@ -68,19 +72,39 @@ const lights = createLights(scene);
 
 const hairpin = tightestSampleIndex(samples); // alvo da inspecao para ver a distorcao no grampo
 
-// Modo de demonstracao (so render): alvos da camera de inspecao
+// Modo debug de texturas/luz (so render, desligado por padrao - ver docs/TEXTURES.md)
 const hud = createDemoHud();
+const trackGeometry = (name) => trackMeshes.group.getObjectByName(name).geometry;
+const uvPanel = createUvLayoutPanel({
+  // Desenhado so na 1a abertura; le geometrias/texturas, nao altera nada
+  build: () =>
+    createUvLayoutSpecs({
+      track: { asphalt: trackGeometry('asphalt'), curbs: trackGeometry('curbs'), rails: trackGeometry('guardRails') },
+      karts: { sport: getKartGeometries('sport'), sedan: getKartGeometries('sedan') },
+      textures: getMaterials().textures,
+      helmetTexture: player.model.helmetTexture,
+      trackWidth: TEST_TRACK.width,
+      // proporcao da textura do capacete = (volta no equador) / (arco do topo a borda)
+      helmetMeters: [HELMET_TEXTURE_SIZE.width, HELMET_TEXTURE_SIZE.height],
+    }).map((spec) => ({ name: spec.name, title: spec.title, canvas: drawUvLayout(spec) })),
+  closeHint: keyLabel(DEBUG_VIEW.keys.uvLayouts),
+  onClose: () => demo.set('uvLayouts', false),
+});
 const demo = createDemoMode({
   scene,
   domElement: canvas,
   aspect: window.innerWidth / window.innerHeight,
+  lights,
   targets: [
     { name: 'kart do jogador', get: (out) => out.copy(player.model.root.position).setY(0.6) },
     { name: 'kart sedan', get: (out) => out.copy(karts[1].model.root.position).setY(0.6) },
     { name: 'emenda da volta (largada)', get: (out) => out.set(samples.px[0], 0, samples.pz[0]) },
     { name: 'grampo', get: (out) => out.set(samples.px[hairpin], 0, samples.pz[hairpin]) },
   ],
-  onChange: (state, targetName) => hud.update(state, targetName),
+  onChange: (state, targetName) => {
+    hud.update(state, targetName);
+    uvPanel.setOpen(state.enabled && state.uvLayouts);
+  },
 });
 demo.collect();
 

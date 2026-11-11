@@ -27,13 +27,16 @@ Alguns pontos técnicos do projeto:
 ### Estado atual
 
 - kart dirigível com física própria (aceleração, freio, ré, aderência lateral, grama mais lenta);
+- **drift**: segurar Espaço e virar faz o kart derrapar de lado numa curva mais fechada, quase sem
+  perder velocidade (ver [docs/PHYSICS.md](docs/PHYSICS.md));
 - 2 tipos de carcaça (*sport* e *sedan*) sobre o mesmo modelo hierárquico;
 - pista de teste provisória gerada pela spline, com zebras e guard rails (só visuais);
 - câmera de perseguição em terceira pessoa;
-- texturas PNG (asfalto, grama, zebra, guard rail, atlas do kart) com UVs gerados, e um modo de
-  demonstração de texturas (ver [Modo de demonstração](#modo-de-demonstração-texturas)).
+- texturas PNG (asfalto, grama, zebra, guard rail, atlas do kart) com UVs gerados, um
+  modo debug de texturas e luz (ver [Modo debug](#modo-debug-texturas-e-luz)) e capacete com
+  faixa e número desenhados em `CanvasTexture` por kart.
 
-Ainda **não** implementados: drift e miniturbo, adversários com IA, voltas e checkpoints,
+Ainda **não** implementados: miniturbo, adversários com IA, voltas e checkpoints,
 pontuação, HUD de corrida, colisões entre karts e com os guard rails
 
 
@@ -57,23 +60,32 @@ node --version
 | Frear / dar ré (quase parado) | `S` ou `↓`      |
 | Virar à esquerda              | `A` ou `←`      |
 | Virar à direita               | `D` ou `→`      |
+| Drift (segurar + virar)       | `Espaço`        |
 | Voltar ao grid de largada     | `R`             |
 
-### Modo de demonstração (texturas)
+### Modo debug (texturas e luz)
 
-Só afeta a renderização; a física continua igual. As teclas também aparecem no painel do canto
-superior esquerdo.
+Desligado por padrão. Liga com `` ` `` (crase: no teclado ABNT2 é a tecla do apóstrofo, à
+esquerda do `1`) ou abrindo `http://localhost:5173/?debug`. Só afeta a renderização; a física
+continua igual. As teclas aparecem no painel do canto superior esquerdo e podem ser trocadas em
+`DEBUG_VIEW.keys` (`src/config/tuning.js`).
 
-| Ação                                                        | Tecla |
-|-------------------------------------------------------------|-------|
-| Alternar texturas reais / UV checker (grade numerada)        | `T`   |
-| Alternar textura + iluminação / só textura (sem luz)         | `L`   |
-| Alternar câmera de perseguição / câmera de inspeção          | `C`   |
-| Próximo alvo da inspeção (jogador, sedan, emenda, grampo)    | `V`   |
-| Esconder/mostrar o painel (para screenshots)                 | `H`   |
+| Ação                                                              | Tecla |
+|-------------------------------------------------------------------|-------|
+| Ligar/desligar o modo debug (desligar volta tudo ao normal)       | `` ` `` |
+| Texturas reais / xadrez de UV numerado                            | `T`   |
+| Com / sem texturas, mantendo a iluminação                         | `M`   |
+| Textura + iluminação / só textura (sem luz)                       | `L`   |
+| Ligar/desligar a luz hemisférica                                  | `1`   |
+| Ligar/desligar o sol (e a sombra)                                 | `2`   |
+| Painel de layouts UV (pista, kart, pneu, capacete) com "baixar PNG" | `U` |
+| Câmera de perseguição / câmera de inspeção                        | `C`   |
+| Próximo alvo da inspeção (jogador, sedan, emenda, grampo)         | `V`   |
+| Esconder/mostrar o painel (para screenshots)                      | `H`   |
 
 Na câmera de inspeção: arrastar com o botão esquerdo orbita, a roda dá zoom e o botão direito
-desloca. O kart continua dirigível e a câmera o acompanha.
+desloca. O kart continua dirigível e a câmera o acompanha. Detalhes e checklist de capturas para
+o relatório em [docs/TEXTURES.md](docs/TEXTURES.md).
 
 ## Outros comandos
 
@@ -86,7 +98,7 @@ desloca. O kart continua dirigível e a câmera o acompanha.
 | `npm run test`      | roda os testes automatizados (Vitest)                            |
 | `npm run lint`      | verifica o código com ESLint                                     |
 | `npm run textures`  | regenera as texturas PNG em `public/textures/` (determinístico)  |
-| `npm run uv-layouts`| exporta imagens do layout UV (kart e pista) para `docs/img/`     |
+| `npm run uv-layouts`| exporta imagens do layout UV (kart, capacete e pista) para `docs/img/` |
 
 ### Publicando o build
 
@@ -187,12 +199,14 @@ precisa de mais segmentos para a silhueta parecer redonda, e o torso fica com 12
 - **Vidro:** material transparente (`opacity: 0.55`) com `depthWrite: false`, para não esconder o
   piloto no depth buffer. Por isso o vidro também não projeta sombra.
 - **Viseira:** `DoubleSide`, porque a esfera aberta deixa a face interna visível.
-- **Atlas de textura:** carcaça, capacete, pneu (banda e tampa com raios), macacão e pele leem
+- **Atlas de textura:** carcaça, pneu (banda e tampa com raios), macacão e pele leem
   um único PNG (`public/textures/kart_atlas.png`), cada peça no seu retângulo. As áreas pintáveis
   do atlas são claras e a cor do material de cada kart multiplica a textura, então os 4 karts
   usam a mesma imagem. Os raios na tampa continuam lá porque um pneu liso girando parece parado.
-  Detalhes dos UVs em [docs/KART_MODEL.md](docs/KART_MODEL.md).
-- **Placa de número** desenhada em `<canvas>` (`CanvasTexture`), uma por kart.
+  O pneu também tem `normalMap` e `roughnessMap` no mesmo layout do atlas (garras e raios em
+  relevo, aro mais brilhante). Detalhes dos UVs em [docs/KART_MODEL.md](docs/KART_MODEL.md).
+- **Placa de número** e **capacete** desenhados em `<canvas>` (`CanvasTexture`), um de cada por
+  kart: o capacete leva a cor do kart, uma faixa de corrida e o número nos lados e na nuca.
 - Texturas de cor em sRGB, para as cores não saírem desbotadas; anisotropia máxima da GPU e
   mipmaps em todas.
 - **Z-fighting:** a placa fica 5 mm atrás da traseira da carcaça (calculada pelo *bounding box*).
@@ -202,7 +216,7 @@ precisa de mais segmentos para a silhueta parecer redonda, e o torso fica com 12
 
 As geometrias ficam em **cache por tipo** e são compartilhadas por todos os karts daquele tipo,
 assim como os materiais neutros (vidro, pneu, pele, viseira). Cada kart cria só o que é dele: o
-material de pintura (cor da carcaça e do capacete) e a textura do número. Isso economiza memória
+material de pintura (cor da carcaça), o material e a textura do capacete e a textura do número. Isso economiza memória
 de GPU, porque os buffers de vértices sobem uma vez só. O `dispose()` de cada kart libera apenas
 os recursos próprios dele.
 

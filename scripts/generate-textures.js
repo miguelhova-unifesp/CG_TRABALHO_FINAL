@@ -319,7 +319,7 @@ function guardrail(rng) {
 
 // kart (atlas)
 
-// Regioes "tingiveis" (pintura e capacete) usam base clara: o material multiplica pela cor do kart.
+// Regioes "tingiveis" (pintura) usam base clara: o material multiplica pela cor do kart.
 const WHITE = 0.95;
 const ACCENT = 0.55; // faixa: sai num tom mais escuro da cor do kart
 const DARK = 0.2;
@@ -383,13 +383,6 @@ const PAINTERS = {
     const lug = fract(s * TREAD_LUGS + off * 0.9); // garras em "V": periodo inteiro na volta
     return g(lug < 0.2 ? 0.04 : 0.1);
   },
-  helmet(s, t) {
-    if (t < 0.12) return g(DARK); // borda inferior
-    if (t > 0.34 && t < 0.44) return g(ACCENT); // faixa horizontal
-    const meridian = Math.min(Math.abs(s - 0.25), Math.abs(s - 0.75)); // frente e tras
-    if (t > 0.44 && meridian < 0.025) return g(ACCENT); // faixa central por cima
-    return g(WHITE);
-  },
   suit(s, t) {
     if (t < 0.15) return g(0.08); // cinto
     const zip = Math.min(s, 1 - s) < 0.008; // ziper na frente (u = 0 = +Z)
@@ -403,8 +396,58 @@ const PAINTERS = {
 };
 
 // Pecas cujo UV da a volta (u = 0 e u = 1 no mesmo meridiano): a margem repete o outro lado
-const WRAP_S = new Set(['tread', 'helmet', 'suit', 'skin']);
+const WRAP_S = new Set(['tread', 'suit', 'skin']);
 const GUTTER = 8;
+
+/**
+ Relevo e rugosidade do pneu, no mesmo layout do atlas: (s, t) -> [altura 0..1, rugosidade 0..1].
+ So a banda e a tampa tem relevo; o resto do atlas fica plano (normal (0,0,1)) e rugosidade 1.
+ Mesma geometria do desenho de cor (PAINTERS.tread / PAINTERS.hub), para relevo e cor coincidirem.
+ */
+const RELIEF = {
+  tread(s, t) {
+    const off = Math.abs(t - 0.5);
+    if (off > 0.42) return [0.7, 0.92]; // ombros, um pouco abaixo das garras
+    if (off < 0.025) return [0.1, 1]; // sulco central
+    const lug = fract(s * TREAD_LUGS + off * 0.9);
+    return lug < 0.2 ? [0.15, 1] : [0.85, 0.82]; // sulco fosco / garra com leve brilho de uso
+  },
+  hub(s, t) {
+    const dx = s - 0.5, dy = t - 0.5;
+    const r = Math.hypot(dx, dy) * 2;
+    const a = Math.atan2(dy, dx);
+    if (r > 0.62) return [r > 0.78 && r < 0.84 ? 0.75 : 0.55, 0.9]; // flanco de borracha + friso
+    if (r > 0.58) return [0.85, 0.4]; // borda do aro (metal)
+    if (r > 0.22) {
+      const spoke = Math.abs(fract((a / (Math.PI * 2)) * 5) - 0.5) < 0.07;
+      return spoke ? [0.75, 0.45] : [0.3, 0.55]; // raio saliente / disco rebaixado
+    }
+    return r < 0.08 ? [0.95, 0.35] : [0.8, 0.45]; // porca / cubo
+  },
+};
+
+function kartAtlasRelief() {
+  const S = ATLAS_SIZE;
+  const height = new Float32Array(S * S).fill(0.5);
+  const rough = createImage(S, S);
+  fillImage(rough, (_x, _y, c) => c.fill(1));
+  for (const [name, fn] of Object.entries(RELIEF)) {
+    const [x0, y0, w, h] = ATLAS_RECTS[name];
+    for (let y = y0 - GUTTER; y < y0 + h + GUTTER; y++) {
+      for (let x = x0 - GUTTER; x < x0 + w + GUTTER; x++) {
+        let s = (x + 0.5 - x0) / w;
+        s = WRAP_S.has(name) ? fract(s) : clamp01(s);
+        const t = clamp01(1 - (y + 0.5 - y0) / h);
+        const [hgt, r] = fn(s, t);
+        height[y * S + x] = hgt;
+        setPixel(rough, x, y, r, r, r);
+      }
+    }
+  }
+  // Atlas nao e periodico: sem wrap (o degrau na borda da margem fica fora das pecas)
+  writePng('kart_atlas_normal', normalFromHeight(height, S, S, 3, { wrapX: false, wrapY: false }));
+  writePng('kart_atlas_roughness', rough);
+}
 
 function kartAtlas(rng) {
   const S = ATLAS_SIZE;
@@ -467,4 +510,5 @@ grass(createRng(SEED + 2));
 curb(createRng(SEED + 3));
 guardrail(createRng(SEED + 4));
 kartAtlas(createRng(SEED + 5));
+kartAtlasRelief(); // sem ruido: nao usa RNG
 uvChecker();

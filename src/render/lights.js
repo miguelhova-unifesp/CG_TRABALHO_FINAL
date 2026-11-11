@@ -19,6 +19,9 @@ export function createLights(scene) {
   scene.add(hemi, sun, sun.target);
 
   return {
+    // Referencias para o modo debug ligar/desligar cada luz (light.visible); parametros intactos
+    hemi,
+    sun,
     /** @param {import('three').Vector3} target */
     follow(target) {
       sun.target.position.copy(target);

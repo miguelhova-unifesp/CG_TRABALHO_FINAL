@@ -27,9 +27,9 @@ import {
   SphereGeometry,
 } from 'three';
 import { KART_TYPES } from '../config/tuning.js';
-import { createNumberTexture, getMaterials } from '../render/materials.js';
+import { createHelmetTexture, createNumberTexture, getMaterials } from '../render/materials.js';
 import { KART_SHAPES } from './kartShapes.js';
-import { ATLAS_RECTS, applyBodyBoxUV, remapToAtlas } from './kartUV.js';
+import { ATLAS_RECTS, HELMET_SPHERE, HELMET_TEXTURE_SIZE, HELMET_LAYOUT, applyBodyBoxUV, remapToAtlas } from './kartUV.js';
 
 const BEVEL = 0.05; // m - arredondamento das arestas da carcaca/cabine
 const HELMET_RADIUS = 0.14; // m
@@ -63,7 +63,8 @@ function extrudeProfile(draw, width) {
 /** Capacete: esfera aberta embaixo, com a faixa da frente num 2o grupo de material (viseira). */
 
 function createHelmetGeometry() {
-  const geometry = new SphereGeometry(HELMET_RADIUS, 20, 14, 0, Math.PI * 2, 0, Math.PI * 0.78);
+  const { widthSegments, heightSegments, thetaLength } = HELMET_SPHERE;
+  const geometry = new SphereGeometry(HELMET_RADIUS, widthSegments, heightSegments, 0, Math.PI * 2, 0, thetaLength);
   const index = geometry.index.array;
   const pos = geometry.attributes.position;
   const shell = [];
@@ -105,7 +106,7 @@ export function getKartGeometries(type) {
     tire,
     torso: remapToAtlas(new CylinderGeometry(0.15, 0.19, TORSO_HEIGHT, 12), [R.suit]),
     head: remapToAtlas(new SphereGeometry(HEAD_RADIUS, 14, 10), [R.skin]),
-    helmet: remapToAtlas(createHelmetGeometry(), [R.helmet, R.helmet]),
+    helmet: createHelmetGeometry(), // UV parametrico da esfera (CanvasTexture por kart)
   };
   geometries.body.computeBoundingBox();
   geometryCache.set(type, geometries);
@@ -131,8 +132,9 @@ function mesh(name, geometry, material) {
  * @returns {{
  *   root: Group,
  *   nodes: Record<string, import('three').Object3D>,
+ *   helmetTexture: import('three').CanvasTexture,
  *   wheelRadius: number,
- *   anim: { wheelSpin: number },
+ *   anim: { frontSpin: number, rearSpin: number },
  *   dispose: () => void,
  * }}
  */
@@ -141,10 +143,15 @@ export function createKartModel({ type, color, number }) {
   const g = getKartGeometries(type);
   const shared = getMaterials();
 
-  // Por instancia: cor da carcaca/capacete (tinge o atlas compartilhado) e textura do numero
+  // Por instancia: cor da carcaca (tinge o atlas compartilhado), textura do numero e do capacete
   const paint = new MeshStandardMaterial({ map: shared.textures.kartAtlas, color, roughness: 0.35, metalness: 0.4 });
+  paint.userData.untexturedColor = color; // modo debug "sem textura": continua na cor do kart
   const numberTexture = createNumberTexture(number);
   const plateMaterial = new MeshStandardMaterial({ map: numberTexture, roughness: 0.6 });
+  // Capacete: faixa + numero desenhados em canvas na cor do kart (o material fica branco)
+  const helmetTexture = createHelmetTexture({ color, number, size: HELMET_TEXTURE_SIZE, layout: HELMET_LAYOUT });
+  const helmetMaterial = new MeshStandardMaterial({ map: helmetTexture, roughness: 0.3, metalness: 0.1 });
+  helmetMaterial.userData.untexturedColor = color;
 
   const root = new Group();
   root.name = `kart-${type}-${number}`;
@@ -166,7 +173,7 @@ export function createKartModel({ type, color, number }) {
   torso.position.y = TORSO_HEIGHT / 2;
   const head = mesh('head', g.head, shared.skin);
   head.position.y = TORSO_HEIGHT + HEAD_RADIUS * 0.9;
-  const helmet = mesh('helmet', g.helmet, [paint, shared.visor]);
+  const helmet = mesh('helmet', g.helmet, [helmetMaterial, shared.visor]);
   helmet.position.y = HELMET_RADIUS - HEAD_RADIUS; // casco centrado um pouco acima da cabeca
 
   head.add(helmet);
@@ -198,12 +205,15 @@ export function createKartModel({ type, color, number }) {
   return {
     root,
     nodes,
+    helmetTexture, // lido pelo export de layout UV (modo debug)
     wheelRadius: shape.wheelRadius,
-    anim: { wheelSpin: 0 },
+    anim: { frontSpin: 0, rearSpin: 0 }, // giro acumulado das rodas (rad), so visual
     dispose() {
       paint.dispose();
       plateMaterial.dispose();
       numberTexture.dispose();
+      helmetMaterial.dispose();
+      helmetTexture.dispose();
       root.removeFromParent();
     },
   };

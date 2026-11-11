@@ -5,7 +5,7 @@ const THROTTLE = ['KeyW', 'ArrowUp'];
 const BRAKE = ['KeyS', 'ArrowDown'];
 const LEFT = ['KeyA', 'ArrowLeft'];
 const RIGHT = ['KeyD', 'ArrowRight'];
-const DRIFT = ['Space']; // reservada: capturada, mas drift continua false nesta etapa
+const DRIFT = ['Space']; // segurar = drift (ver physics/kartPhysics.js)
 const CAPTURED = new Set([...THROTTLE, ...BRAKE, ...LEFT, ...RIGHT, ...DRIFT]);
 
 /**
@@ -42,7 +42,7 @@ export function createKeyboardInput(target = window) {
       out.throttle = any(THROTTLE) ? 1 : 0;
       out.brake = any(BRAKE) ? 1 : 0;
       out.steer = (any(RIGHT) ? 1 : 0) - (any(LEFT) ? 1 : 0);
-      out.drift = false;
+      out.drift = any(DRIFT);
       return out;
     },
     isDown: (code) => down.has(code),

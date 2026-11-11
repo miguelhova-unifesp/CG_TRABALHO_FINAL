@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { getKartGeometries } from '../src/kart/kartModel.js';
-import { ATLAS_RECTS, ATLAS_SIZE, KART_TEXEL_DENSITY, TREAD_LUGS } from '../src/kart/kartUV.js';
+import {
+  ATLAS_RECTS,
+  ATLAS_SIZE,
+  HELMET_LAYOUT,
+  HELMET_SPHERE,
+  HELMET_TEXTURE_SIZE,
+  KART_TEXEL_DENSITY,
+  TREAD_LUGS,
+} from '../src/kart/kartUV.js';
 
 /** Retangulo do atlas em UV: [u0, v0, u1, v1]. */
 function uvRect([x, y, w, h]) {
@@ -106,8 +114,16 @@ for (const type of ['sport', 'sedan']) {
       expect(Math.abs(density / KART_TEXEL_DENSITY - 1)).toBeLessThan(0.1);
     });
 
-    it('capacete, torso e cabeca ficam nos seus retangulos', () => {
-      for (const [name, rect] of [['helmet', 'helmet'], ['torso', 'suit'], ['head', 'skin']]) {
+    it('toda geometria texturizada tem 1 UV por vertice, sem NaN', () => {
+      for (const name of ['body', 'tire', 'torso', 'head', 'helmet']) {
+        const geo = g[name];
+        expect(geo.attributes.uv.count).toBe(geo.attributes.position.count);
+        expect(Array.from(geo.attributes.uv.array).every(Number.isFinite)).toBe(true);
+      }
+    });
+
+    it('torso e cabeca ficam nos seus retangulos', () => {
+      for (const [name, rect] of [['torso', 'suit'], ['head', 'skin']]) {
         const uv = g[name].attributes.uv;
         for (let i = 0; i < uv.count; i++) {
           expect(inside(uv.getX(i), uv.getY(i), uvRect(ATLAS_RECTS[rect]))).toBe(true);
@@ -116,3 +132,38 @@ for (const type of ['sport', 'sedan']) {
     });
   });
 }
+
+describe('capacete (UV proprio + CanvasTexture por kart)', () => {
+  const geo = getKartGeometries('sport').helmet;
+  const pos = geo.attributes.position;
+  const uv = geo.attributes.uv;
+  const radius = Math.hypot(pos.getX(0), pos.getY(0), pos.getZ(0));
+
+  it('v = 1 no topo, 0 na borda de baixo, proporcional a latitude', () => {
+    for (let i = 0; i < pos.count; i++) {
+      const theta = Math.acos(Math.max(-1, Math.min(1, pos.getY(i) / radius)));
+      expect(uv.getY(i)).toBeCloseTo(1 - theta / HELMET_SPHERE.thetaLength, 4);
+    }
+  });
+
+  it('HELMET_LAYOUT aponta para o lado certo (frente = +Z, esquerda = +X)', () => {
+    const expected = { front: [0, 1], left: [1, 0], back: [0, -1], right: [-1, 0] };
+    for (const [side, [ex, ez]] of Object.entries(expected)) {
+      let found = 0;
+      for (let i = 0; i < pos.count; i++) {
+        const h = Math.hypot(pos.getX(i), pos.getZ(i));
+        if (h < radius * 0.5) continue; // perto do polo a longitude nao tem significado
+        const du = Math.abs(uv.getX(i) - HELMET_LAYOUT[side]);
+        if (Math.min(du, 1 - du) > 1e-6) continue;
+        expect((pos.getX(i) * ex + pos.getZ(i) * ez) / h).toBeGreaterThan(0.999);
+        found++;
+      }
+      expect(found).toBeGreaterThan(0);
+    }
+  });
+
+  it('textura com texel quadrado no equador (largura/altura = 2*pi / thetaLength)', () => {
+    const ratio = HELMET_TEXTURE_SIZE.width / HELMET_TEXTURE_SIZE.height;
+    expect(ratio / ((2 * Math.PI) / HELMET_SPHERE.thetaLength)).toBeCloseTo(1, 2);
+  });
+});

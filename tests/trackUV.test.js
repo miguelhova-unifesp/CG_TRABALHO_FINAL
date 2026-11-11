@@ -35,6 +35,10 @@ for (const [name, { geometry, across, n }] of Object.entries(meshes)) {
     const pos = geometry.attributes.position;
     const list = strips(geometry, across, n);
 
+    it('tem 1 UV por vertice', () => {
+      expect(uv.count).toBe(pos.count);
+    });
+
     it('nao tem NaN e u fica em [0, 1]', () => {
       expect(Array.from(uv.array).every(Number.isFinite)).toBe(true);
       for (let i = 0; i < uv.count; i++) {
@@ -84,6 +88,28 @@ describe('UV sem esticar ao longo do tracado', () => {
       const i = r * a + mid, j = (r - 1) * a + mid;
       const ds = Math.hypot(pos.getX(i) - pos.getX(j), pos.getZ(i) - pos.getZ(j));
       expect((uv.getY(i) - uv.getY(j)) * tile).toBeCloseTo(ds, 3);
+    }
+  });
+
+  it('zebras e rails: razao v / arco constante (= 1 / tile) ao longo da faixa', () => {
+    // Ponto medio de cada linha da faixa: na zebra e a propria linha media (exato); na face do rail
+    // fica a railThickness / 2 da linha media, entao a razao varia 1 - k * 0.05 (< 1% no grampo).
+    for (const [name, key, tol] of [['zebras', 'curb', 1e-3], ['guard rails', 'rail', 0.01]]) {
+      const { geometry: g, across: a, n } = meshes[name];
+      const pos = g.attributes.position;
+      const uv = g.attributes.uv;
+      for (let strip = 0; strip < n; strip++) {
+        const first = strip * rows * a;
+        const mid = (r, axis) => (pos[axis](first + r * a) + pos[axis](first + r * a + a - 1)) / 2;
+        let arc = 0;
+        let ratio0 = null;
+        for (let r = 1; r < rows; r++) {
+          arc += Math.hypot(mid(r, 'getX') - mid(r - 1, 'getX'), mid(r, 'getZ') - mid(r - 1, 'getZ'));
+          const ratio = (uv.getY(first + r * a) * TRACK_GEN.uvTile[key]) / arc;
+          ratio0 ??= ratio;
+          expect(Math.abs(ratio / ratio0 - 1)).toBeLessThan(tol);
+        }
+      }
     }
   });
 
@@ -143,6 +169,7 @@ describe('guard rails', () => {
 describe('grama', () => {
   it('UV planar no mundo: uv * grassTile = (x, -z)', () => {
     const g = createGrassGeometry(samples);
+    expect(g.attributes.uv.count).toBe(g.attributes.position.count);
     const pos = g.attributes.position;
     const uv = g.attributes.uv;
     for (let i = 0; i < pos.count; i++) {

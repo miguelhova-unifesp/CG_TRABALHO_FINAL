@@ -25,8 +25,36 @@ export const ATLAS_RECTS = {
   hub: [776, 644, 160, 160], // tampas do pneu (UV radial do cilindro)
   skin: [776, 820, 160, 80], // cabeca
   tread: [8, 916, 512, 80], // banda de rodagem: u = volta inteira, v = largura
-  helmet: [536, 916, 224, 80], // casco: u = longitude, v = latitude
+  // (o capacete nao esta no atlas: usa o UV da esfera com uma CanvasTexture por kart, ver HELMET_*)
   suit: [776, 916, 240, 100], // torso
+};
+
+/**
+ Capacete: esfera aberta embaixo. O UV e o parametrico da SphereGeometry (u = longitude 0..1,
+ v = 1 no topo e 0 na borda de baixo), sem remapear para o atlas.
+ */
+export const HELMET_SPHERE = { widthSegments: 20, heightSegments: 14, thetaLength: Math.PI * 0.78 };
+
+/**
+ Onde fica cada lado do capacete no UV. Na SphereGeometry x = -cos(2*pi*u), z = sin(2*pi*u):
+ +Z (frente, viseira) em u = 0.25, +X (esquerda) em 0.5, -Z (nuca) em 0.75, -X (direita) em 0 = 1.
+ equatorV: v da linha do equador (theta = pi/2).
+ */
+export const HELMET_LAYOUT = {
+  front: 0.25,
+  left: 0.5,
+  back: 0.75,
+  right: 0,
+  equatorV: 1 - Math.PI / 2 / HELMET_SPHERE.thetaLength,
+};
+
+/**
+ Tamanho da CanvasTexture do capacete: proporcao = (volta no equador) / (arco do topo a borda), para
+ o texel ser quadrado no equador (2*pi*R / (thetaLength*R)); o raio cancela.
+ */
+export const HELMET_TEXTURE_SIZE = {
+  width: 512,
+  height: Math.round((512 * HELMET_SPHERE.thetaLength) / (2 * Math.PI)), // 200
 };
 
 /** Numero inteiro de garras na banda: o desenho repete exatamente na volta (emenda continua). */

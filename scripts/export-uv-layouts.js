@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { PNG } from 'pngjs';
 import { TRACK_GEN } from '../src/config/tuning.js';
 import { getKartGeometries } from '../src/kart/kartModel.js';
+import { HELMET_TEXTURE_SIZE } from '../src/kart/kartUV.js';
 import { TEST_TRACK } from '../src/track/trackData.js';
 import { buildTrackSamples, tightestSampleIndex } from '../src/track/trackGeometry.js';
 import { createAsphaltGeometry, createCurbGeometry, createRailGeometry } from '../src/track/trackMeshes.js';
@@ -107,7 +108,6 @@ function kartLayouts() {
     ['tire', [255, 210, 0]],
     ['torso', [0, 200, 255]],
     ['head', [0, 255, 120]],
-    ['helmet', [255, 0, 255]],
   ];
   for (const type of ['sport', 'sedan']) {
     const g = getKartGeometries(type);
@@ -116,6 +116,15 @@ function kartLayouts() {
     for (const [name, rgb] of parts) uvWireframe(c, g[name], [0, 1, 0, 1], rgb);
     save(`uv_kart_${type}`, c);
   }
+}
+
+/** Capacete: UV proprio (esfera), fundo = xadrez de UV (a textura real e uma CanvasTexture no navegador). */
+function helmetLayout() {
+  const g = getKartGeometries('sport');
+  const c = createCanvas(HELMET_TEXTURE_SIZE.width * 2, HELMET_TEXTURE_SIZE.height * 2);
+  uvBackground(c, readTexture('uv_checker'), [0, 1, 0, 1], [1, 1], false);
+  uvWireframe(c, g.helmet, [0, 1, 0, 1], [255, 0, 255]);
+  save('uv_helmet', c);
 }
 
 // pista
@@ -201,6 +210,7 @@ function worldChecker(name, cx, cz, half) {
 
 mkdirSync(OUT, { recursive: true });
 kartLayouts();
+helmetLayout();
 trackUvLayouts();
 worldChecker('world_checker_seam', samples.px[0], samples.pz[0], 16);
 const h = tightestSampleIndex(samples);

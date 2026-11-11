@@ -92,3 +92,99 @@ rail nao colide.
 entrega de iluminacao nao mudaram: a sombra continua seguindo o jogador.
 
 **Motivo:** nao tocar em physics/ai/race nem no determinismo; o modo e removivel sem efeito no jogo.
+
+## 2026-11-11 - Modo debug desligado por padrao, teclas em tuning.js
+
+**Decisao:** o modo de demonstracao de texturas virou "modo debug": comeca desligado
+(`DEBUG_VIEW.enabledByDefault = false`), liga com `` ` `` ou `?debug` na URL, e todas as teclas
+ficam em `DEBUG_VIEW.keys`. Desligar o modo restaura texturas, luzes e camera.
+
+**Motivo:** o jogo normal nao deve ter painel nem teclas extras ativas; para o relatorio basta uma
+tecla. Teclas configuraveis num lugar so (regra 7), sem conflito com W/A/S/D, setas, Espaco e R.
+
+## 2026-11-11 - Liga/desliga de cada luz por light.visible
+
+**Decisao:** `createLights` passou a devolver `hemi` e `sun`; o modo debug alterna
+`light.visible`. Nenhum parametro de luz mudou.
+
+**Motivo:** o three tira luzes invisiveis do calculo (e o sol invisivel tambem para de gerar
+sombra), entao da para comparar a contribuicao de cada luz sem criar/remover objetos nem tocar na
+configuracao da entrega de iluminacao.
+
+## 2026-11-11 - "Sem textura" usa cor lisa aproximando a media da textura
+
+**Decisao:** a tecla `M` tira `map`, `normalMap` e `roughnessMap` e troca a cor do material por
+`userData.untexturedColor` (tabela `UNTEXTURED_COLOR` em `render/materials.js`; pintura e capacete
+usam a cor do kart). No xadrez de UV a cor vai para branco.
+
+**Motivo:** varios materiais tem `color` branca e a cor vem toda da textura (pneu, macacao, zebra);
+sem textura ficariam brancos e a comparacao "com x sem textura" mediria a cor, nao a textura. No
+xadrez, a tinta do kart escurecia as celulas e atrapalhava ler os numeros.
+
+## 2026-11-11 - Capacete com UV proprio e CanvasTexture por kart
+
+**Decisao:** o capacete saiu do atlas: usa o UV parametrico da esfera e um material proprio por
+kart com `createHelmetTexture` (cor do kart, faixa de corrida, numero nos lados e na nuca). Canvas
+de 512 x 200 px (`HELMET_TEXTURE_SIZE`), proporcao = volta no equador / arco do topo a borda.
+A posicao de frente/lados/nuca no UV (`HELMET_LAYOUT`) e testada contra a geometria.
+
+**Motivo:** pedido da entrega (desenho por kart). Continua valendo a regra 8: mesma geometria para
+todos, so o desenho do canvas muda, como a placa de numero. Com texel quadrado no equador o numero
+nao sai achatado; perto do topo a longitude comprime (inevitavel numa esfera), por isso la so ha
+faixas ao longo dos meridianos.
+
+## 2026-11-11 - Relevo do pneu no layout do atlas
+
+**Decisao:** `kart_atlas_normal.png` e `kart_atlas_roughness.png` tem o mesmo layout do atlas, com
+relevo/rugosidade so nos retangulos `tread` e `hub` (resto plano, rugosidade 1). So os materiais do
+pneu usam esses mapas. Gerados sem ruido, a partir da mesma geometria do desenho de cor.
+
+**Motivo:** o pneu ja le o atlas, entao os mapas reaproveitam os UVs sem textura nova por peca. O
+relevo das garras deixa a roda girando visivel com o sol de lado. A pintura continua lisa de
+proposito (carro de brinquedo estilizado).
+
+## 2026-11-11 - Layout UV exportado no navegador, alem do script Node
+
+**Decisao:** `render/uvLayout.js` desenha os triangulos de cada malha no espaco UV, sobre a propria
+textura, num canvas com a proporcao real em metros; o painel (`U`) baixa cada um como PNG. O
+`scripts/export-uv-layouts.js` continua gerando as imagens de `docs/img/`.
+
+**Motivo:** a apresentacao pede mostrar as coordenadas UV dentro do jogo, incluindo o capacete (que
+so existe como CanvasTexture no navegador). O script continua util para o relatorio sem abrir o jogo.
+
+## 2026-11-11 - Sem tunel nesta entrega
+
+**Decisao:** nao foi criado tunel. A interacao luz x textura e mostrada com os toggles de cada luz,
+o guard rail metalico e a sombra dos karts no asfalto.
+
+**Motivo:** o tunel e uma malha nova gerada da spline (escopo de pista), fora do que esta entrega
+pede; decisao do grupo.
+
+## 2026-11-11 - Drift arcade por aderencia baixa, lado travado
+
+**Decisao:** o drift (Espaco + direcional) baixa a aderencia lateral (`DRIFT.gripFactor`, com rampa
+de entrada/saida em `driftAmount`), trava o lado na entrada (`driftDir`) e troca o esterco por 3
+angulos fixos (dentro/solto/contra) sem queda com a velocidade. Parte do modulo da velocidade que a
+aderencia tiraria volta para a frente (`speedRetention`). Cancela ao soltar, frear, sair do asfalto
+ou ficar abaixo de `exitSpeed`; um novo drift exige soltar e apertar o botao (`driftLatch`).
+
+**Motivo:** segue a decisao de 2026-10-29 (drift = baixar `lateralGrip`), sem modelo de pneu. Lado
+travado + direcional so abrindo/fechando e o controle classico de kart arcade: da para segurar o
+drift a curva toda sem rodar. Sem `speedRetention` o grip baixo matava a velocidade lateral e o drift
+virava freio (~10 m/s^2 de perda nas simulacoes). A rampa evita o "tranco" da saida. Com o botao
+solto `driftAmount = 0` e a fisica e identica a anterior. `driftTime` fica no estado para o
+miniturbo. Tudo em `KartState`, deterministico (teste de replay com drift).
+
+## 2026-11-11 - Contra-esterco visual das rodas no drift
+
+**Decisao:** no drift as rodas da frente mostram o angulo de deriva (apontam para a velocidade) em
+vez do esterco fisico, que aponta para dentro da curva. Mistura por `driftAmount`, limite em
+`STEERING.maxSteer`. Rodas de tras com giro extra (`KART_ANIM.driftWheelspin`). `model.anim.wheelSpin`
+virou `frontSpin` e `rearSpin`.
+
+**Motivo:** o `steerAngle` do estado e o da bicicleta cinematica do drift (para dentro); mostrado
+direto, o kart parece "virar contra" a derrapagem. Contra-esterco e o que se espera ver num drift.
+Calculado so a partir do estado (regra 3, teste confere que nada e escrito); `driftAmount` ja tem a
+rampa de entrada/saida, entao a roda nao "pula". O limite reaproveita o esterco maximo normal, que ja
+era o maior angulo visual do pneu sem atravessar a carcaca.
+

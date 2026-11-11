@@ -42,6 +42,26 @@ export const STEERING = {
   steerRate: 3.0, // rad/s - velocidade com que as rodas viram ate o alvo
 };
 
+// Drift (Espaco + esterco). A direcao trava na entrada; o esterco so abre/fecha a curva.
+// Ver docs/PHYSICS.md. Estes sao os numeros de SENSACAO do drift: ajustar jogando.
+export const DRIFT = {
+  minSpeed: 8, // m/s - velocidade minima para entrar no drift
+  exitSpeed: 5, // m/s - abaixo disso o drift acaba sozinho
+  minSteer: 0.3, // adimensional - |steer| minimo para entrar (define o lado do drift)
+  gripFactor: 0.3, // adimensional - multiplica lateralGrip no drift (menor = mais de lado)
+  steerInner: 0.16, // rad - esterco com o direcional para dentro da curva (raio ~13 m)
+  steerNeutral: 0.11, // rad - esterco sem direcional (raio ~19 m)
+  steerOuter: 0.06, // rad - esterco contra-esterco (raio ~35 m); nunca inverte o lado
+  speedRetention: 0.8, // adimensional [0, 1] - fracao da velocidade que a derrapagem tiraria e que volta para a frente
+  enterTime: 0.15, // s - rampa da aderencia ate o valor de drift
+  exitTime: 0.3, // s - rampa da aderencia de volta ao normal (sem "tranco" na saida)
+};
+
+// Animacao procedural do kart (so visual: kart/kartAnimation.js le o estado, nunca escreve)
+export const KART_ANIM = {
+  driftWheelspin: 0.3, // adimensional - no drift as rodas de tras giram (1 + isto) x o que rolariam
+};
+
 export const OFFROAD = {
   accelFactor: 0.5, // adimensional - multiplica engineAccel na grama
   gripFactor: 0.5, // adimensional - multiplica lateralGrip na grama
@@ -71,6 +91,24 @@ export const TRACK_GEN = {
   // para caber um numero inteiro de tiles na volta (emenda sem salto)
   uvTile: { asphalt: 12, curb: 2, rail: 2 },
   grassTile: 8, // m - 1 tile de UV da grama (projecao planar no mundo)
+};
+
+// Modo debug de texturas/luz (so render, ver docs/TEXTURES.md). Teclas por event.code
+// (posicao fisica: Backquote = tecla a esquerda do 1, no ABNT2 e a do apostrofo).
+export const DEBUG_VIEW = {
+  enabledByDefault: false, // tambem liga com ?debug na URL
+  keys: {
+    toggle: 'Backquote', // liga/desliga o modo debug inteiro
+    checker: 'KeyT', // textura xadrez de UV no lugar de todas as texturas
+    textures: 'KeyM', // com/sem texturas (map, normal, roughness), mantendo a luz
+    unlit: 'KeyL', // so textura, sem luz (MeshBasicMaterial)
+    hemiLight: 'Digit1', // liga/desliga a luz hemisferica
+    sunLight: 'Digit2', // liga/desliga o sol (e a sombra)
+    uvLayouts: 'KeyU', // painel com os layouts UV (baixar PNG)
+    inspect: 'KeyC', // camera de inspecao (orbita)
+    nextTarget: 'KeyV', // proximo alvo da inspecao
+    hud: 'KeyH', // esconde o painel de teclas (screenshots)
+  },
 };
 
 export const GRID = {
